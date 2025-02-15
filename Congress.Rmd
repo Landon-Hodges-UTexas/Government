@@ -1,0 +1,41 @@
+---
+title: "Congress"
+author: "Landon Hodges"
+date: "2025-02-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(congress)
+library(jsonlite)
+library(rvest)
+library(tidyverse)
+Sys.setenv(CONGRESS_KEY='ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA')
+```
+
+## Congress
+
+The following code :
+
+```{r bills}
+bills <- cong_bill() # Grab 20 bills from the api
+bills$url <- str_replace(bills$url, "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
+bill <- fromJSON(bills$url[1]) # snag the json data for the particular bill
+
+# Process the bill's text into html data
+text_url <- str_replace(bill[["bill"]][["textVersions"]][["url"]], "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
+bill_text <- read_json(text_url)
+text_html <- read_html(bill_text[["textVersions"]][[1]][["formats"]][[1]][["url"]])
+
+# Find the last action taken on the bill
+actions_url <- str_replace(bill[["bill"]][["actions"]][["url"]], "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
+bill_actions <- read_json(actions_url)
+actions_text <- bill_actions[["actions"]][[1]][["text"]]
+
+# Write the prompt
+final <- str_c("Summarize the following congressional action in three paragraphs, focusing on the most notable news for a citizen of the United States: ", actions_text, "concerning the following act: ",  html_text(text_html))
+final <- str_remove_all(final, "\\n")
+write(final, file="daily_prompt.txt")
+```
+
