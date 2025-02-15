@@ -7,10 +7,12 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+install.packages("reticulate")
 library(congress)
 library(jsonlite)
 library(rvest)
 library(tidyverse)
+library(reticulate)
 Sys.setenv(CONGRESS_KEY='ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA')
 ```
 
@@ -19,11 +21,17 @@ Sys.setenv(CONGRESS_KEY='ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA')
 The following code :
 
 ```{r bills}
-bills <- cong_bill() # Grab 20 bills from the api
-bills$url <- str_replace(bills$url, "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
-bill <- fromJSON(bills$url[1]) # snag the json data for the particular bill
+bills <- cong_bill(limit = 5) # Grab 3 bills from the api
+bills$urls <- str_replace(bills$url, "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
 
-# Process the bill's text into html data
+t <- 1
+i <- 1
+markdown_summaries <- c()
+for (i in 1:length(bills$urls)) {
+bill <- fromJSON(bills$urls[i]) # snag the json data for the particular bill
+answer <- ""
+
+if (!is.null(bill$bill$textVersions$url)) {
 text_url <- str_replace(bill[["bill"]][["textVersions"]][["url"]], "format=json", "api_key=ylNUWZnes2WfGOh5YT6bJsOHtWZPj3zbfUKXcJlA")
 bill_text <- read_json(text_url)
 text_html <- read_html(bill_text[["textVersions"]][[1]][["formats"]][[1]][["url"]])
@@ -34,8 +42,18 @@ bill_actions <- read_json(actions_url)
 actions_text <- bill_actions[["actions"]][[1]][["text"]]
 
 # Write the prompt
-final <- str_c("Summarize the following congressional action in three paragraphs, focusing on the most notable news for a citizen of the United States: ", actions_text, "concerning the following act: ",  html_text(text_html))
+final <- str_c("Summarize the following congressional action, focusing on the most notable news for a citizen of the United States: ", actions_text, "concerning the following act: ",  html_text(text_html))
 final <- str_remove_all(final, "\\n")
 write(final, file="daily_prompt.txt")
+
+source_python("News.py")
+answer <- deepseek(final)
+
+}
+
+markdown_summaries[t] <- answer
+t = t+1
+}
+markdown_summaries
 ```
 
